@@ -23,7 +23,6 @@ library(dplyr)
 library(ggplot2)
 library(plotly)
 library(wordcloud)
-setwd("C:/Users/Deepak kumar/Downloads/R/UP Elections")
 ```
 
 ##Reading the data,
