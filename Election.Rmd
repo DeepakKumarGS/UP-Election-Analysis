@@ -1,0 +1,101 @@
+---
+title: "UP Election Analysis"
+author: "Deepak Kumar"
+date: "July 27, 2017"
+output: 
+  html_document:
+     fig_width: 10
+     fig_height: 5
+     theme: united
+     highlight: tango
+     toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading required libraries,
+
+```{r}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(wordcloud)
+setwd("C:/Users/Deepak kumar/Downloads/R/UP Elections")
+```
+
+##Reading the data,
+```{r}
+res=read.csv("up_res.csv",stringsAsFactors = FALSE,header=TRUE)
+glimpse(res)
+dim(res)
+
+unique(res$party)
+length(unique(res$ac))
+length(unique(res$phase))
+```
+
+Let us get the overview of the election results,
+
+```{r}
+temp= res %>% select(ac,party,votes)
+```
+
+```{r}
+temp=res %>% group_by(party) %>% summarise(count=sum(votes)) %>% mutate(perc=(count/sum(count))*100) %>% arrange(desc(count))
+plot_ly(temp,x=temp$party,y=temp$count,color=temp$party,type="bar",text=list(x = temp$party, y = temp$count)) %>% layout(title = "Votes Polled by each Party",showlegend = FALSE)
+```
+
+BJP+ won the election with thumping majority defeating INC+SP combine.
+
+#NOTA(None Of the Above) :
+
+Instead of going by the regular route of analysing the win % and other things,lets carryout interesting analysis to get insights.Lets find out the total votes polled by NOTA and the corresponding consitituency.
+
+```{r}
+temp=res %>% filter(res$candidate=="None of the Above") %>% arrange(desc(votes)) %>% head(30)
+plot_ly(temp,x=~temp$ac,y=~temp$votes,type="bar",color=temp$ac,text=list(x=temp$party,y=temp$votes)) %>% layout(title="Constituency with highest NOTA votes",showlegend= FALSE,xaxis=list(title="Constituency"),yaxis=list(title="Votes"))
+```
+
+#No of Seats won by Each Party:
+
+
+```{r}
+temp = res %>% group_by(ac_no) %>% mutate(Position=order(votes,decreasing=TRUE)) %>% filter(Position == 1) %>% mutate(win=ifelse(Position==1,party,NOTA)) %>% select(ac_no,win) %>% group_by(win) %>% summarise(count=n()) %>% arrange(desc(count))
+plot_ly(temp,x=~factor(temp$win,levels=win),y=~temp$count,color=~temp$win,type="bar",text=list(x="Party",y="Seats")) %>% layout(title="Seats won by each party in UP 2017 Assembly Elections",xaxis=list(title="Party"),yaxis=list(title="Seats"))
+```
+
+#Constituency with highest margin of win for BJP+ combine:
+
+
+```{r}
+temp=res %>% group_by(ac_no,ac) %>% mutate(pos=order(votes,decreasing=TRUE))
+temp_windiff=temp %>% select(ac_no,party,votes,pos,ac) %>% filter(pos==1 | pos==2)
+tempdiff=temp_windiff %>% group_by(ac_no) %>% mutate(diff=ifelse(pos== 1,(votes-lead(votes)),(votes-lag(votes)))) %>% arrange(desc(diff))
+winBJP=tempdiff %>% filter(party=="BJP+" & pos==1) %>% select(votes,ac,diff) %>% arrange(desc(diff)) 
+plot_ly(winBJP,x=~winBJP$ac,y=~winBJP$diff,type="bar",color=winBJP$ac,text=list(x="Costituency",y="Vote Difference"))%>% layout(title="Margin of Vote count between winner and runnerup for BJP won costituencies",xaxis=list(title="Constituency"),yaxis=list(title="Vote Difference"))
+```
+
+While Sahibabad constituency has been won by BJP+ with huge margin of 1.5L votes,Dumariyaganj constituency has been won by them with a wafer thin margin of 171 votes.
+
+#Consituency with highest margin of win for INC+SP combine:
+
+```{r}
+winINC=tempdiff %>% filter((party=="INC" | party=="SP" )& pos==1 ) %>% select(votes,ac,diff) %>% arrange(desc(diff)) 
+plot_ly(winINC,x=~winINC$ac,y=~winINC$diff,type="bar",color=winINC$ac,text=list(x="Costituency",y="Vote Difference"))%>% layout(title="Margin of Vote count between winner and runnerup for INC+SP won costituencies",xaxis=list(title="Constituency"),yaxis=list(title="Vote Difference"))
+```
+
+Rae Bareli has been won by INC with vote difference of 89163 while Mohanlalganj (SC) constituency has been won only with a vote difference of 530.
+
+
+#Constituency winner and runner up data:
+
+
+```{r}
+
+q=ddply(temp_windiff,.(pos,party),summarize,count=n())
+p=ggplot(q,aes(x=party,y=count))+geom_bar(stat="identity",aes(fill=party))+theme(axis.text.x=element_text(angle=90))+labs(fill="Party",x="Party",y="Count")+ggtitle("Winner and Runnerup splitup")+facet_grid(.~q$pos)
+ggplotly(p)
+```
